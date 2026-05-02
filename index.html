@@ -13,6 +13,9 @@ import {
   Hash,
   ExternalLink
 } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, addDoc, onSnapshot } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyB3G7S8LfImvYJ3XcSP0QB__v7xGrC1pFI",
