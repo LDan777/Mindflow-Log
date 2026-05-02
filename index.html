@@ -1,0 +1,336 @@
+import React, { useState } from 'react';
+import { 
+  Calendar, 
+  MessageCircle, 
+  Heart, 
+  Sparkles, 
+  Clock, 
+  LayoutGrid, 
+  Plus,
+  MapPin,
+  Bot,
+  History,
+  Hash,
+  ExternalLink
+} from 'lucide-react';
+
+// 类别定义与视觉配置（新增了 DIALOGUE）
+const CATEGORIES = {
+  EVENT: { id: 'EVENT', label: '事情', icon: Calendar, color: 'bg-blue-100 text-blue-800 border-blue-200', dot: 'bg-blue-500' },
+  REACTION: { id: 'REACTION', label: '反应', icon: MessageCircle, color: 'bg-orange-100 text-orange-800 border-orange-200', dot: 'bg-orange-500' },
+  EMOTION: { id: 'EMOTION', label: '情绪', icon: Heart, color: 'bg-rose-100 text-rose-800 border-rose-200', dot: 'bg-rose-500' },
+  THOUGHT: { id: 'THOUGHT', label: '随想', icon: Sparkles, color: 'bg-indigo-100 text-indigo-800 border-indigo-200', dot: 'bg-indigo-500' },
+  DIALOGUE: { id: 'DIALOGUE', label: '对话/AI', icon: Bot, color: 'bg-emerald-100 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' }
+};
+
+// 初始模拟数据，加入了模糊回忆和AI对话
+const INITIAL_ENTRIES = [
+  { id: '1', type: 'EVENT', text: '抵达了新的城市，今晚住在老城区。时差还没倒过来。', timeMode: 'EXACT', date: '2026-05-01', timestamp: Date.now() - 100000 },
+  { id: '2', type: 'EMOTION', text: '突然感到一种巨大的平静，仿佛世界按下了暂停键。', timeMode: 'NONE', date: '', timestamp: Date.now() - 80000 },
+  { id: '3', type: 'DIALOGUE', text: '和 DeepSeek 探讨了一下“数字游民的归属感”问题。它说：“归属感不一定来自于固定的物理坐标，也可以是你内心构建的秩序。” 很有启发。', timeMode: 'EXACT', date: '2026-05-02', timestamp: Date.now() - 60000 },
+  { id: '4', type: 'THOUGHT', text: '童年某个夏天的午后，蝉鸣声很响。现在想起来，那似乎是我对“无聊”最美好的体验。', timeMode: 'FUZZY', fuzzyLabel: '童年某个夏天', timestamp: Date.now() - 40000 },
+  { id: '5', type: 'REACTION', text: '遇到突发情况时，我发现自己比以前冷静多了。', timeMode: 'NONE', date: '', timestamp: Date.now() - 20000 },
+];
+
+export default function App() {
+  const [entries, setEntries] = useState(INITIAL_ENTRIES);
+  const [view, setView] = useState('TIMELINE'); // 'TIMELINE' or 'FRAGMENTS'
+  const [filter, setFilter] = useState('ALL');
+  
+  // 获取今天日期的安全做法 (YYYY-MM-DD)
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // 表单状态
+  const [text, setText] = useState('');
+  const [type, setType] = useState('THOUGHT');
+  
+  // 时间模式：'EXACT' (精确日期), 'FUZZY' (模糊时段), 'NONE' (无时间)
+  const [timeMode, setTimeMode] = useState('EXACT'); 
+  const [exactDate, setExactDate] = useState(today);
+  const [fuzzyLabel, setFuzzyLabel] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+
+    // 处理未填写的默认情况
+    const finalDate = timeMode === 'EXACT' && !exactDate ? today : exactDate;
+    const finalFuzzy = timeMode === 'FUZZY' && !fuzzyLabel.trim() ? '某个模糊的时刻' : fuzzyLabel;
+
+    const newEntry = {
+      id: Date.now().toString(),
+      type,
+      text,
+      timeMode,
+      date: timeMode === 'EXACT' ? finalDate : '',
+      fuzzyLabel: timeMode === 'FUZZY' ? finalFuzzy : '',
+      timestamp: Date.now()
+    };
+
+    setEntries([newEntry, ...entries]);
+    setText('');
+    setExactDate(today);
+    setFuzzyLabel('');
+    
+    // 提交后智能切换视图
+    if (timeMode === 'EXACT') setView('TIMELINE');
+    else setView('FRAGMENTS');
+  };
+
+  // 过滤和排序逻辑
+  const filteredEntries = entries.filter(e => filter === 'ALL' || e.type === filter);
+  
+  // 时光轴只显示有精确日期的
+  const timelineEntries = filteredEntries
+    .filter(e => e.timeMode === 'EXACT')
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // 碎片视图显示 无时间 和 模糊时间 的记录
+  const fragmentEntries = filteredEntries
+    .filter(e => e.timeMode !== 'EXACT')
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  // 渲染单个卡片
+  const EntryCard = ({ entry }) => {
+    const Cat = CATEGORIES[entry.type];
+    const Icon = Cat.icon;
+    
+    return (
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow duration-300 group">
+        <div className="flex justify-between items-start mb-3 gap-2 flex-wrap">
+          <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 ${Cat.color}`}>
+            <Icon size={14} />
+            {Cat.label}
+          </span>
+          
+          {/* 时间标签展示 */}
+          {entry.timeMode === 'EXACT' && entry.date && (
+            <span className="text-xs text-slate-500 font-medium font-mono flex items-center gap-1">
+              <Calendar size={12} />
+              {entry.date}
+            </span>
+          )}
+          {entry.timeMode === 'FUZZY' && entry.fuzzyLabel && (
+            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100 font-medium flex items-center gap-1">
+              <History size={12} />
+              {entry.fuzzyLabel}
+            </span>
+          )}
+        </div>
+        <p className="text-slate-700 leading-relaxed text-sm md:text-base whitespace-pre-wrap">{entry.text}</p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans selection:bg-indigo-100">
+      <div className="max-w-6xl mx-auto px-4 py-8 md:py-12 flex flex-col lg:flex-row gap-8">
+        
+        {/* 左侧：输入控制台 */}
+        <div className="lg:w-[380px] flex-shrink-0">
+          <div className="sticky top-8 space-y-6">
+            
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-2 flex items-center gap-2">
+                <MapPin className="text-indigo-500" />
+                心流轨迹
+              </h1>
+              <p className="text-sm text-slate-500 mb-6">
+                归档你的确切经历、模糊回忆与 AI 对话。
+              </p>
+
+              {/* 输入表单 */}
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="此刻，你在经历、回忆或探讨什么？..."
+                    className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none transition-all text-sm"
+                    required
+                  />
+                </div>
+
+                {/* 分类选择 */}
+                <div className="grid grid-cols-3 gap-2">
+                  {Object.values(CATEGORIES).map((cat) => {
+                    const Icon = cat.icon;
+                    return (
+                      <button
+                        type="button"
+                        key={cat.id}
+                        onClick={() => setType(cat.id)}
+                        className={`flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                          type === cat.id 
+                            ? `${cat.color} ring-2 ring-offset-1 ring-${cat.color.split('-')[1]}-400` 
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Icon size={18} />
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* DeepSeek 快捷入口 (仅在选中 DIALOGUE 时显示) */}
+                {type === 'DIALOGUE' && (
+                  <div className="bg-slate-50 border border-emerald-100 p-3 rounded-xl flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Bot size={16} className="text-emerald-500"/>
+                      <span>想要获取新的灵感？</span>
+                    </div>
+                    <a 
+                      href="https://chat.deepseek.com/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
+                    >
+                      问 DeepSeek
+                      <ExternalLink size={12} />
+                    </a>
+                  </div>
+                )}
+
+                {/* 时间模式选择器 */}
+                <div className="space-y-3 pt-2 border-t border-slate-100">
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                    <Clock size={16} className="text-slate-400"/>
+                    时间属性
+                  </label>
+                  
+                  <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setTimeMode('EXACT')}
+                      className={`flex-1 flex justify-center items-center gap-1.5 py-1.5 text-xs font-medium rounded-lg transition-all ${timeMode === 'EXACT' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <Calendar size={14} /> 精确日期
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimeMode('FUZZY')}
+                      className={`flex-1 flex justify-center items-center gap-1.5 py-1.5 text-xs font-medium rounded-lg transition-all ${timeMode === 'FUZZY' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <History size={14} /> 模糊回忆
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimeMode('NONE')}
+                      className={`flex-1 flex justify-center items-center gap-1.5 py-1.5 text-xs font-medium rounded-lg transition-all ${timeMode === 'NONE' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <Hash size={14} /> 无时间
+                    </button>
+                  </div>
+
+                  {/* 动态输入框 */}
+                  <div className="min-h-[48px]">
+                    {timeMode === 'EXACT' && (
+                      <input
+                        type="date"
+                        value={exactDate}
+                        onChange={(e) => setExactDate(e.target.value)}
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-slate-700 animate-in fade-in"
+                      />
+                    )}
+                    {timeMode === 'FUZZY' && (
+                      <input
+                        type="text"
+                        value={fuzzyLabel}
+                        onChange={(e) => setFuzzyLabel(e.target.value)}
+                        placeholder="例如：童年、2018年秋天、某个月夜..."
+                        className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-700 animate-in fade-in"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full bg-slate-900 text-white font-medium py-3.5 rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
+                >
+                  <Plus size={18} />
+                  封存记录
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* 右侧：展示区 */}
+        <div className="lg:flex-1">
+          
+          {/* 视图切换与过滤器 */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200">
+              <button
+                onClick={() => setView('TIMELINE')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  view === 'TIMELINE' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Clock size={16} />
+                确切时光轴
+              </button>
+              <button
+                onClick={() => setView('FRAGMENTS')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  view === 'FRAGMENTS' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <LayoutGrid size={16} />
+                碎片与回忆
+              </button>
+            </div>
+
+            <select 
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="bg-white border border-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 text-slate-600 shadow-sm"
+            >
+              <option value="ALL">全部维度</option>
+              {Object.values(CATEGORIES).map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 视图内容区 */}
+          <div className="min-h-[500px]">
+            {view === 'TIMELINE' && (
+              <div className="relative border-l-2 border-slate-200 ml-4 md:ml-8 space-y-8 pb-12">
+                {timelineEntries.length === 0 ? (
+                  <div className="pl-8 text-slate-400 text-sm py-10">暂无带有确切日期的记录。</div>
+                ) : (
+                  timelineEntries.map((entry) => (
+                    <div key={entry.id} className="relative pl-8 md:pl-10">
+                      {/* 时间轴圆点 */}
+                      <div className={`absolute -left-[9px] top-4 w-4 h-4 rounded-full ring-4 ring-[#f8fafc] ${CATEGORIES[entry.type].dot}`} />
+                      <EntryCard entry={entry} />
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {view === 'FRAGMENTS' && (
+              <div className="columns-1 sm:columns-2 gap-6 space-y-6">
+                {fragmentEntries.length === 0 ? (
+                  <div className="text-slate-400 text-sm py-10 text-center w-full block">暂无散落的碎片或模糊的回忆。</div>
+                ) : (
+                  fragmentEntries.map((entry) => (
+                    <div key={entry.id} className="break-inside-avoid">
+                      <EntryCard entry={entry} />
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
